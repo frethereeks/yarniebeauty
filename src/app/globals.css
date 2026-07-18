@@ -1,0 +1,224 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   YARNIEBEAUTY DESIGN TOKENS
+   Warm black + sharpened gold. Editorial restraint over maximalism.
+   ========================================================================== */
+
+:root {
+  /* Core palette */
+  --color-ink: #171411; /* primary near-black, warm not cold */
+  --color-ink-soft: #221d18; /* raised surfaces on dark */
+  --color-charcoal: #3d3530; /* secondary surfaces, borders on dark */
+  --color-gold: #c9a227; /* signature accent — the "thread" */
+  --color-gold-bright: #e3c567; /* hover / foil highlight */
+  --color-gold-deep: #9c7d1d; /* pressed states, text-on-cream accents */
+  --color-cream: #faf6ee; /* light surface, public-site background */
+  --color-cream-soft: #f1ead9; /* cards on cream */
+  --color-line: #e3d9c4; /* hairline borders on cream */
+  --color-line-dark: #4a4038; /* hairline borders on ink */
+
+  /* Functional — muted, never neon */
+  --color-success: #5b7553;
+  --color-error: #a1453a;
+  --color-warning: #ad7d2c;
+
+  /* Text */
+  --color-text-on-cream: #171411;
+  --color-text-on-cream-muted: #6b5f52;
+  --color-text-on-ink: #f1ead9;
+  --color-text-on-ink-muted: #a89a85;
+}
+
+@theme inline {
+  --color-ink: var(--color-ink);
+  --color-ink-soft: var(--color-ink-soft);
+  --color-charcoal: var(--color-charcoal);
+  --color-gold: var(--color-gold);
+  --color-gold-bright: var(--color-gold-bright);
+  --color-gold-deep: var(--color-gold-deep);
+  --color-cream: var(--color-cream);
+  --color-cream-soft: var(--color-cream-soft);
+  --color-line: var(--color-line);
+  --color-line-dark: var(--color-line-dark);
+  --color-success: var(--color-success);
+  --color-error: var(--color-error);
+  --color-warning: var(--color-warning);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+}
+
+/* ==========================================================================
+   BASE
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-text-on-cream);
+}
+
+/* Visible, branded focus ring everywhere — never remove outline without replacing it */
+:focus-visible {
+  outline: 2px solid var(--color-gold-deep);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ==========================================================================
+   CURSOR — Tailwind's Preflight sets `button { cursor: default }` to match
+   native OS button behavior, but for a content-driven, click-heavy app like
+   this one, that's the wrong default: users rely on the pointer cursor to
+   tell what's interactive. Restore the pointer cursor on every clickable
+   control, but respect :disabled so disabled buttons still look inert.
+   ========================================================================== */
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+a,
+summary,
+select,
+input[type="checkbox"],
+input[type="radio"],
+input[type="submit"],
+input[type="button"] {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   TYPE SCALE
+   Display = Cormorant (editorial, needle-thin/thick contrast)
+   Body/UI  = Manrope (clean geometric sans)
+   ========================================================================== */
+
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+}
+
+.font-body {
+  font-family: var(--font-body), -apple-system, sans-serif;
+}
+
+.text-eyebrow {
+  font-family: var(--font-body), sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.text-display-xl {
+  font-family: var(--font-display), serif;
+  font-weight: 600;
+  font-size: clamp(2.75rem, 6vw, 5.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+}
+
+.text-display-lg {
+  font-family: var(--font-display), serif;
+  font-weight: 600;
+  font-size: clamp(2.25rem, 4vw, 3.5rem);
+  line-height: 1.05;
+}
+
+.text-display-md {
+  font-family: var(--font-display), serif;
+  font-weight: 600;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  line-height: 1.1;
+}
+
+/* ==========================================================================
+   SIGNATURE ELEMENT — the gold thread
+   A single continuous stroke used as section dividers / hero ornament.
+   Used sparingly: once per major section break, never as repeating decoration.
+   ========================================================================== */
+
+.thread-divider {
+  width: 100%;
+  height: 24px;
+  overflow: visible;
+}
+
+.thread-divider path {
+  fill: none;
+  stroke: var(--color-gold);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .thread-draw path {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: thread-draw 1.4s ease-out forwards;
+  }
+}
+
+@keyframes thread-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ==========================================================================
+   SCROLL REVEALS — restrained, used via data attribute + small IO hook
+   ========================================================================== */
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-reveal] {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+  }
+  [data-reveal="visible"] {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   PRODUCT CARD HOVER — restrained scale, no shadow drama
+   ========================================================================== */
+
+.product-card-image {
+  transition: transform 0.25s ease-out;
+}
+
+.group:hover .product-card-image {
+  transform: scale(1.03);
+}
+
+/* Selection color matches brand instead of default blue */
+::selection {
+  background: var(--color-gold);
+  color: var(--color-ink);
+}

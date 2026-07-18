@@ -1,0 +1,588 @@
+// ============================================================================
+// YARNIEBEAUTY — Prisma Schema
+// E-commerce (yarn/crochet products) + Academy (crochet cohorts)
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+/// Business-facing roles. A user can hold more than one (e.g. Customer + Student).
+enum Role {
+  SuperAdmin
+  Admin
+  Customer
+  Student
+}
+
+/// Granular permissions a SuperAdmin can grant to a regular Admin.
+/// Presence of a row = permission granted. Absence = denied.
+enum AdminPermissionType {
+  MANAGE_PRODUCTS
+  MANAGE_ORDERS
+  MANAGE_COHORTS
+  MANAGE_ENROLMENTS
+  MANAGE_CONTACT_MESSAGES
+  SEND_BROADCASTS
+  VIEW_LOGGER
+}
+
+enum AccountStatus {
+  Pending // local signup, awaiting email confirmation
+  Active
+  Suspended
+}
+
+enum AuthProvider {
+  local
+  google
+}
+
+enum ProductVisibility {
+  Available
+  Unavailable
+}
+
+enum ContactStatus {
+  Unread
+  Read
+  Deleted
+}
+
+enum OrderStatus {
+  Pending
+  Confirmed
+  Processing
+  OutForDelivery
+  Delivered
+  Returned
+  Cancelled
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING // lock while verifying with Paystack
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  PAYSTACK
+}
+
+/// What a Payment is for — lets one Payment model serve Orders and Cohort enrolments.
+enum PaymentPurpose {
+  ORDER
+  ENROLMENT
+}
+
+enum StudyMode {
+  Physical
+  Online
+}
+
+/// Whether the cohort's mode is fixed by the admin, or the student may choose.
+enum CohortModePolicy {
+  PhysicalOnly
+  OnlineOnly
+  StudentChoice
+}
+
+enum CohortStatus {
+  Upcoming
+  Ongoing
+  Completed
+  Cancelled
+}
+
+enum EnrolmentStatus {
+  AwaitingPayment
+  Active
+  Completed
+  Withdrawn
+}
+
+/// Audience for a SuperAdmin broadcast message.
+enum BroadcastAudience {
+  ALL
+  CUSTOMERS
+  STUDENTS
+}
+
+enum LogAction {
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_CHANGE
+  LOGIN
+  ROLE_CHANGE
+  BROADCAST
+}
+
+// ============================================================================
+// USER & AUTH
+// ============================================================================
+
+model User {
+  id        String  @id @default(cuid())
+  firstname String  @db.VarChar(50)
+  lastname  String  @db.VarChar(50)
+  email     String  @unique @db.VarChar(100)
+  phone     String? @db.VarChar(20)
+
+  /// Optional because Google sign-in users never set one.
+  password String?      @db.VarChar(100)
+  provider AuthProvider @default(local)
+
+  image         String? @db.VarChar(500) // Cloudinary secure_url
+  imagePublicId String? @db.VarChar(255)
+
+  /// local signups start Pending until they confirm via emailed link.
+  /// google signups start Active immediately.
+  status AccountStatus @default(Pending)
+
+  /// Email confirmation token (local signups only). Cleared once confirmed.
+  emailVerifyToken   String?   @db.VarChar(255)
+  emailVerifyExpires DateTime?
+  emailVerifiedAt    DateTime?
+
+  /// Password reset
+  resetToken   String?   @db.VarChar(255)
+  resetExpires DateTime?
+
+  /// Default delivery address, reused to prefill checkout.
+  defaultAddress String? @db.TinyText
+  defaultCity    String? @db.VarChar(100)
+  defaultState   String? @db.VarChar(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roles              UserRole[]
+  adminPermissions   AdminPermission[]       @relation("GrantedTo")
+  permissionsGranted AdminPermission[]       @relation("GrantedBy")
+  notificationPref   NotificationPreference?
+  cart               Cart?
+  orders             Order[]
+  enrolments         CohortEnrolment[]
+  contactMessages    Contact[]
+  sentMessages       Message[]               @relation("MessageSender")
+  receivedMessages   MessageRecipient[]
+  broadcastsSent     Broadcast[]             @relation("BroadcastSender")
+  logs               Logger[]                @relation("LogActor")
+  productsCreated    Product[]               @relation("ProductCreator")
+  cohortsCreated     Cohort[]                @relation("CohortCreator")
+  ordersUpdated      Order[]                 @relation("OrderUpdatedBy")
+
+  @@index([email])
+  @@map("YnBeautyUser")
+}
+
+/// Join table: a user can have multiple roles (e.g. Customer AND Student).
+model UserRole {
+  id        String   @id @default(cuid())
+  role      Role
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, role])
+  @@index([userId(length: 36)])
+  @@map("YnBeautyUserRole")
+}
+
+/// Granular capability grants for regular Admins. SuperAdmin implicitly has everything
+/// and never needs rows here — this table only matters for Role = Admin.
+model AdminPermission {
+  id          String              @id @default(cuid())
+  type        AdminPermissionType
+  user        User                @relation("GrantedTo", fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  grantedBy   User                @relation("GrantedBy", fields: [grantedById], references: [id])
+  grantedById String
+  createdAt   DateTime            @default(now())
+
+  @@unique([userId, type])
+  @@index([userId(length: 36)])
+  @@map("YnBeautyAdminPermission")
+}
+
+model NotificationPreference {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  emailOrderUpdates    Boolean @default(true)
+  emailCohortReminders Boolean @default(true)
+  emailBroadcasts      Boolean @default(true)
+  inAppNotifications   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("YnBeautyNotificationPreference")
+}
+
+// ============================================================================
+// CATALOG
+// ============================================================================
+
+model Category {
+  id        String            @id @default(cuid())
+  name      String            @db.VarChar(100)
+  slug      String            @unique(length: 100) @db.VarChar(120)
+  status    ProductVisibility @default(Available)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  products Product[]
+
+  @@index([slug(length: 120)])
+  @@map("YnBeautyCategory")
+}
+
+model Product {
+  id           String            @id @default(cuid())
+  name         String            @db.VarChar(150)
+  slug         String            @unique(length: 100) @db.VarChar(180)
+  price        Decimal           @db.Decimal(12, 2)
+  qtyAvailable Int               @default(0)
+  popular      Boolean           @default(false)
+  description  String?           @db.MediumText
+  status       ProductVisibility @default(Unavailable) // off until admin explicitly publishes
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  category   Category @relation(fields: [categoryId], references: [id])
+  categoryId String
+
+  creator   User   @relation("ProductCreator", fields: [creatorId], references: [id])
+  creatorId String
+
+  images     ProductImage[]
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+
+  @@index([categoryId(length: 36)])
+  @@index([status])
+  @@map("YnBeautyProduct")
+}
+
+/// Images live on Cloudinary — we store the secure delivery URL plus the
+/// publicId so the admin UI / server actions can delete or transform them.
+model ProductImage {
+  id        String   @id @default(cuid())
+  secureUrl String   @db.VarChar(500)
+  publicId  String   @db.VarChar(255)
+  isPrimary Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+
+  @@index([productId(length: 36)])
+  @@map("YnBeautyProductImage")
+}
+
+// ============================================================================
+// CART
+// ============================================================================
+
+model Cart {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @unique(length: 36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items CartItem[]
+
+  @@map("YnBeautyCart")
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cartId    String   @db.VarChar(36)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String   @db.VarChar(36)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId])
+  @@index([cartId(length: 36)])
+  @@map("YnBeautyCartItem")
+}
+
+// ============================================================================
+// ORDERS
+// ============================================================================
+
+model Order {
+  id          String @id @default(cuid())
+  orderNumber String @unique(length: 30) @db.VarChar(30) // human-friendly e.g. YB-20260624-9F3A2B1C
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  // Delivery info captured at checkout (kept on the order even if the user
+  // later changes their saved profile address).
+  fullname String  @db.VarChar(100)
+  email    String  @db.VarChar(100)
+  phone    String  @db.VarChar(20)
+  address  String  @db.TinyText
+  city     String  @db.VarChar(100)
+  state    String  @db.VarChar(100)
+  notes    String? @db.TinyText
+
+  status     OrderStatus @default(Pending)
+  totalPrice Decimal     @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  updatedBy   User?   @relation("OrderUpdatedBy", fields: [updatedById], references: [id])
+  updatedById String?
+
+  items         OrderItem[]
+  payment       Payment?
+  statusHistory OrderStatusHistory[]
+
+  @@index([userId(length: 36)])
+  @@index([status])
+  @@map("YnBeautyOrder")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+
+  // Snapshot at time of purchase — price/name must not drift if the product changes later.
+  productName String  @db.VarChar(150)
+  price       Decimal @db.Decimal(12, 2)
+  quantity    Int     @default(1)
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId(length: 36)])
+  @@map("YnBeautyOrderItem")
+}
+
+/// Every status transition, who made it, and an optional note — feeds both
+/// the admin order timeline and the "status changed" emails.
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  status    OrderStatus
+  note      String?     @db.TinyText
+  changedBy String? // userId of admin; null if system-generated
+  createdAt DateTime    @default(now())
+
+  @@index([orderId(length: 36)])
+  @@map("YnBeautyOrderStatusHistory")
+}
+
+// ============================================================================
+// ACADEMY (COHORTS)
+// ============================================================================
+
+model Cohort {
+  id            String  @id @default(cuid())
+  title         String  @db.VarChar(150)
+  slug          String  @unique @db.VarChar(180)
+  description   String  @db.MediumText
+  image         String? @db.VarChar(500) // Cloudinary secure_url
+  imagePublicId String? @db.VarChar(255)
+
+  price     Decimal  @db.Decimal(12, 2)
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  /// Human-readable duration label, e.g. "6 weeks" — dates are source of truth for logic.
+  duration  String   @db.VarChar(50)
+
+  modePolicy CohortModePolicy @default(StudentChoice)
+  status     CohortStatus     @default(Upcoming)
+  capacity   Int? // null = unlimited
+
+  /// Flags so we don't re-send "starting today" / "ending soon" emails twice.
+  startReminderSentAt DateTime?
+  endReminderSentAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  creator   User   @relation("CohortCreator", fields: [creatorId], references: [id])
+  creatorId String
+
+  enrolments CohortEnrolment[]
+
+  @@index([status])
+  @@index([startDate])
+  @@map("YnBeautyCohort")
+}
+
+model CohortEnrolment {
+  id       String @id @default(cuid())
+  cohort   Cohort @relation(fields: [cohortId], references: [id])
+  cohortId String @db.VarChar(36)
+  user     User   @relation(fields: [userId], references: [id])
+  userId   String @db.VarChar(36)
+
+  /// The mode the student is enrolled under — set directly from the cohort
+  /// if modePolicy is fixed, or chosen by the student if StudentChoice.
+  mode   StudyMode
+  price  Decimal         @db.Decimal(12, 2) // snapshot of cohort price at enrolment time
+  status EnrolmentStatus @default(AwaitingPayment)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payment Payment?
+
+  @@unique([cohortId, userId])
+  @@index([userId(length: 36)])
+  @@index([cohortId(length: 36)])
+  @@map("YnBeautyCohortEnrolment")
+}
+
+// ============================================================================
+// PAYMENTS (Paystack) — shared by Orders and Cohort Enrolments
+// ============================================================================
+
+model Payment {
+  id      String         @id @default(cuid())
+  purpose PaymentPurpose
+
+  order       Order?           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId     String?          @unique(length: 36) @db.VarChar(36)
+  enrolment   CohortEnrolment? @relation(fields: [enrolmentId], references: [id], onDelete: Cascade)
+  enrolmentId String?          @unique(length: 36) @db.VarChar(36)
+
+  amount Decimal       @db.Decimal(12, 2)
+  status PaymentStatus @default(PENDING)
+  method PaymentMethod @default(PAYSTACK)
+
+  reference        String  @unique @db.VarChar(100) // our generated reference, sent to Paystack
+  paystackRef      String? @db.VarChar(100) // Paystack's own transaction reference, if different
+  authorizationUrl String? @db.VarChar(500)
+  channel          String? @db.VarChar(50) // card, bank_transfer, etc., from Paystack callback
+
+  notes  String?   @db.TinyText
+  paidAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([reference(length: 100)])
+  @@map("YnBeautyPayment")
+}
+
+// ============================================================================
+// MESSAGING (direct + broadcast)
+// ============================================================================
+
+/// A single message thread entry — used for direct admin <-> user messages
+/// that show up in the user's "Messages" dashboard tab.
+model Message {
+  id        String   @id @default(cuid())
+  sender    User     @relation("MessageSender", fields: [senderId], references: [id])
+  senderId  String   @db.VarChar(36)
+  subject   String   @db.VarChar(200)
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  recipients MessageRecipient[]
+
+  @@map("YnBeautyMessage")
+}
+
+model MessageRecipient {
+  id        String    @id @default(cuid())
+  message   Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId String    @db.VarChar(36)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String    @db.VarChar(36)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([messageId, userId])
+  @@index([userId(length: 36)])
+  @@map("YnBeautyMessageRecipient")
+}
+
+/// SuperAdmin broadcast — one row per broadcast "blast"; fan-out to individual
+/// Message + MessageRecipient rows is handled at send-time so it still shows
+/// up in each user's normal Messages tab.
+model Broadcast {
+  id             String            @id @default(cuid())
+  sender         User              @relation("BroadcastSender", fields: [senderId], references: [id])
+  senderId       String            @db.VarChar(36)
+  audience       BroadcastAudience
+  subject        String            @db.VarChar(200)
+  body           String            @db.Text
+  recipientCount Int               @default(0)
+  createdAt      DateTime          @default(now())
+
+  @@map("YnBeautyBroadcast")
+}
+
+// ============================================================================
+// CONTACT (public contact form)
+// ============================================================================
+
+model Contact {
+  id       String        @id @default(cuid())
+  fullname String        @db.VarChar(100)
+  email    String        @db.VarChar(100)
+  phone    String        @db.VarChar(50)
+  message  String        @db.VarChar(1000)
+  status   ContactStatus @default(Unread)
+
+  /// Set if the submitter happened to be logged in — optional, purely informational.
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String? @db.VarChar(36)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@map("YnBeautyContact")
+}
+
+// ============================================================================
+// AUDIT LOG
+// ============================================================================
+
+model Logger {
+  id      String    @id @default(cuid())
+  action  LogAction
+  table   String    @db.VarChar(50)
+  /// Free-text description, e.g. "Updated order YB-20260624-0001 status: Pending -> Confirmed"
+  message String    @db.LongText
+
+  actor   User?   @relation("LogActor", fields: [actorId], references: [id])
+  actorId String? @db.VarChar(36)
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId(length: 36)])
+  @@index([table(length: 50)])
+  @@map("YnBeautyLogger")
+}
