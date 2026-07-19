@@ -63,7 +63,7 @@ export function EnrolledStudentsTable({ enrolments }: { enrolments: EnrolmentRow
             size="small"
             value={e.status}
             style={{ width: 130 }}
-            onChange={(val) => handleStatusChange(e.id, val)}
+            onChange={(val) => handleStatusChange(e.id, val as ("Active" | "Completed" | "Withdrawn"))}
             options={[
               { value: "Active", label: "Active" },
               { value: "Completed", label: "Completed" },

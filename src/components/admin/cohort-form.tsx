@@ -11,8 +11,8 @@ type CohortFormValues = {
   title: string;
   description: string;
   price: number;
-  startDate: string;
-  endDate: string;
+  startDate: string | Date;
+  endDate: string | Date;
   duration: string;
   modePolicy: "PhysicalOnly" | "OnlineOnly" | "StudentChoice";
   capacity: number | null;
@@ -66,9 +66,10 @@ export function CohortForm({
     }
 
     startTransition(async () => {
+      const dataValues = {...values, startDate: values.startDate as Date, endDate: values.endDate as Date}
       const result = isEdit
-        ? await updateCohort(cohortId!, values, imageDataUrl ?? undefined)
-        : await createCohort(values, imageDataUrl ?? undefined);
+        ? await updateCohort(cohortId!, dataValues, imageDataUrl ?? undefined)
+        : await createCohort(dataValues, imageDataUrl ?? undefined);
 
       if (result.ok) {
         message.success(isEdit ? "Cohort updated" : "Cohort created");

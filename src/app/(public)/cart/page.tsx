@@ -9,7 +9,7 @@ export default async function CartPage() {
   return (
     <div className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
       <h1 className="text-display-lg mb-12">Your cart</h1>
-      <CartView items={cart?.items ?? []} />
+      <CartView items={cart?.items.map(el => ({...el, product: {...el.product, price: +(el.product.price ?? 0)}})) ?? []} />
     </div>
   );
 }

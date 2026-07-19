@@ -11,6 +11,7 @@ export default async function AdminCohortDetailPage({
 }) {
   const { id } = await params;
   const cohort = await getAdminCohortById(id);
+  const cohortData = {...cohort, price: +(cohort?.price ?? 0), enrolments: cohort?.enrolments.map(el => ({...el, price: +(el.price ?? 0)}))}
 
   if (!cohort) notFound();
 
@@ -33,7 +34,7 @@ export default async function AdminCohortDetailPage({
           </h2>
         </div>
         <div className="bg-white border border-line">
-          <EnrolledStudentsTable enrolments={cohort.enrolments} />
+          <EnrolledStudentsTable enrolments={cohortData.enrolments!} />
         </div>
       </div>
 

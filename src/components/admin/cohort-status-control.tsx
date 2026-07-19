@@ -4,11 +4,13 @@ import { useTransition } from "react";
 import { Select, App } from "antd";
 import { updateCohortStatus } from "@/actions";
 
+type TStatusTypes = "Upcoming" | "Ongoing" | "Completed" | "Cancelled"
+
 export function CohortStatusControl({ cohortId, currentStatus }: { cohortId: string; currentStatus: string }) {
   const [isPending, startTransition] = useTransition();
   const { message } = App.useApp();
 
-  function handleChange(status: "Upcoming" | "Ongoing" | "Completed" | "Cancelled") {
+  function handleChange(status: TStatusTypes) {
     startTransition(async () => {
       const result = await updateCohortStatus(cohortId, status);
       if (result.ok) message.success("Cohort status updated");
@@ -20,7 +22,7 @@ export function CohortStatusControl({ cohortId, currentStatus }: { cohortId: str
     <Select
       size="large"
       className="w-full"
-      defaultValue={currentStatus}
+      defaultValue={currentStatus as TStatusTypes}
       disabled={isPending}
       onChange={handleChange}
       options={[
