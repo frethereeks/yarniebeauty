@@ -53,6 +53,7 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
           id="email"
           name="email"
           type="email"
+          placeholder="mondaysalis@email.com"
           required
           className="w-full border border-line px-4 py-3 bg-white focus-visible:outline-none focus-visible:border-gold-deep"
         />
@@ -70,6 +71,8 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
           id="password"
           name="password"
           type="password"
+          placeholder="*********"
+          minLength={6}
           required
           className="w-full border border-line px-4 py-3 bg-white focus-visible:outline-none focus-visible:border-gold-deep"
         />

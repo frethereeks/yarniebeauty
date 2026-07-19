@@ -13,11 +13,11 @@ export function RegisterForm() {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const input = {
-      firstname: String(form.get("firstname") ?? ""),
-      lastname: String(form.get("lastname") ?? ""),
-      email: String(form.get("email") ?? ""),
-      phone: String(form.get("phone") ?? ""),
-      password: String(form.get("password") ?? ""),
+      firstname: String(form.get("firstname") ?? "") as string,
+      lastname: String(form.get("lastname") ?? "") as string,
+      email: String(form.get("email") ?? "") as string,
+      phone: String(form.get("phone") ?? "") as string,
+      password: String(form.get("password") ?? "") as string,
     };
 
     setFieldErrors({});
@@ -48,16 +48,18 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="First name" name="firstname" error={fieldErrors.firstname} required />
-        <Field label="Last name" name="lastname" error={fieldErrors.lastname} required />
+      <div className="grid gap-4">
+        <Field label="First name" placeholder="Damilola" name="firstname" error={fieldErrors.firstname} required />
+        <Field label="Last name" placeholder="Okoli" name="lastname" error={fieldErrors.lastname} required />
       </div>
-      <Field label="Email" name="email" type="email" error={fieldErrors.email} required />
-      <Field label="Phone" name="phone" type="tel" error={fieldErrors.phone} />
+      <Field label="Email" placeholder="damikolie@email.com" name="email" type="email" error={fieldErrors.email} required />
+      <Field label="Phone" placeholder="08038262892" minLength={11} maxLength={11} name="phone" type="tel" error={fieldErrors.phone} />
       <Field
         label="Password"
         name="password"
         type="password"
+        placeholder="*********"
+        minLength={6}
         error={fieldErrors.password}
         hint="At least 8 characters, with an uppercase letter and a number."
         required
@@ -79,17 +81,23 @@ export function RegisterForm() {
 function Field({
   label,
   name,
+  placeholder,
   type = "text",
   error,
   hint,
   required,
+  maxLength = 1000,
+  minLength = 0,
 }: {
   label: string;
   name: string;
+  placeholder?: string;
   type?: string;
   error?: string;
   hint?: string;
   required?: boolean;
+  maxLength?: number 
+  minLength?: number 
 }) {
   return (
     <div>
@@ -100,6 +108,9 @@ function Field({
         id={name}
         name={name}
         type={type}
+        minLength={minLength ? minLength : required ? 1 : 0}
+        maxLength={maxLength ?? 1000}
+        placeholder={placeholder ?? ""}
         required={required}
         className="w-full border border-line px-4 py-3 bg-white focus-visible:outline-none focus-visible:border-gold-deep"
       />

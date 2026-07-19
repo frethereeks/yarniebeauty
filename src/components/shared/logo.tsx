@@ -34,7 +34,7 @@ export function Logo({ variant = "icon", size = 40, className = "" }: LogoProps)
     );
   }
 
-  const width = Math.round(size / ICON_ASPECT);
+  const width = Math.round(size / ICON_ASPECT) ?? "auto";
 
   return (
     <Image

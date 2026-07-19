@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { App } from "antd";
 import { submitContactForm } from "@/actions";
+import { Field } from "../shared/input-field";
 
 export function ContactForm() {
   const [isPending, startTransition] = useTransition();
@@ -45,15 +46,16 @@ export function ContactForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <Field label="Full name" name="fullname" error={fieldErrors.fullname} required />
-      <Field label="Email" name="email" type="email" error={fieldErrors.email} required />
-      <Field label="Phone" name="phone" type="tel" error={fieldErrors.phone} required />
+      <Field placeholder="Ebuka Sunday" label="Full name" name="fullname" error={fieldErrors.fullname} required />
+      <Field placeholder="ebukson@email.com" label="Email" name="email" type="email" error={fieldErrors.email} required />
+      <Field placeholder="07083282612" minLength={11} maxLength={11} label="Phone" name="phone" type="tel" error={fieldErrors.phone} required />
       <div>
         <label className="block text-eyebrow text-text-on-cream-muted mb-2" htmlFor="message">
           Message
         </label>
         <textarea
           id="message"
+          placeholder="Send message..."
           name="message"
           rows={5}
           required
@@ -69,35 +71,5 @@ export function ContactForm() {
         {isPending ? "Sending…" : "Send message"}
       </button>
     </form>
-  );
-}
-
-function Field({
-  label,
-  name,
-  type = "text",
-  error,
-  required,
-}: {
-  label: string;
-  name: string;
-  type?: string;
-  error?: string;
-  required?: boolean;
-}) {
-  return (
-    <div>
-      <label className="block text-eyebrow text-text-on-cream-muted mb-2" htmlFor={name}>
-        {label}
-      </label>
-      <input
-        id={name}
-        name={name}
-        type={type}
-        required={required}
-        className="w-full border border-line px-4 py-3 bg-white focus-visible:outline-none focus-visible:border-gold-deep"
-      />
-      {error && <p className="text-error text-sm mt-1">{error}</p>}
-    </div>
   );
 }
